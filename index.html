@@ -125,6 +125,10 @@
     .btn-blue:hover  { filter: brightness(1.15); }
     .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
     .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+    .btn-teal  { background: #0e7c6a; color: #fff; }
+    .btn-teal:hover  { filter: brightness(1.15); }
+    .btn-dark  { background: #2a2a2a; color: #888; border: 1px solid #444; }
+    .btn-dark:hover  { border-color: var(--red); color: var(--red); }
     .btn-block { width: 100%; display: block; padding: 13px; font-size: 1.05rem; }
 
     .player-tag {
@@ -458,6 +462,58 @@
     .delta-pos { color: #4caf50; }
     .delta-neg { color: var(--red); }
 
+    /* Chip strip */
+    .chip-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 14px 0 8px;
+    }
+    .chip-token {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      border: 3px dashed rgba(255,255,255,.28);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: .68rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform .1s, filter .15s;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,.6);
+      user-select: none;
+      letter-spacing: -.02em;
+    }
+    .chip-token:hover  { filter: brightness(1.25); transform: scale(1.08) translateY(-2px); }
+    .chip-token:active { transform: scale(.92); }
+    .chip-c1   { background: radial-gradient(circle at 35% 35%, #d8d8d8, #909090); color: #222; text-shadow: none; }
+    .chip-c5   { background: radial-gradient(circle at 35% 35%, #e85050, #a01010); }
+    .chip-c10  { background: radial-gradient(circle at 35% 35%, #4080e0, #1840b0); }
+    .chip-c25  { background: radial-gradient(circle at 35% 35%, #40b840, #186818); }
+    .chip-c50  { background: radial-gradient(circle at 35% 35%, #e08030, #904020); }
+    .chip-c100 { background: radial-gradient(circle at 35% 35%, #383838, #101010); }
+    .chip-c500 { background: radial-gradient(circle at 35% 35%, #9050d0, #501890); }
+    .chip-c1k  { background: radial-gradient(circle at 35% 35%, #c8a810, #806408); }
+    .chip-c5k  { background: radial-gradient(circle at 35% 35%, #50c8c8, #187878); }
+
+    .bet-total-display {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--gold2);
+      letter-spacing: -.02em;
+      margin: 6px 0 2px;
+    }
+    .bet-total-label {
+      text-align: center;
+      font-size: .75rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
     /* Chop modal */
     .mode-toggle {
       display: flex;
@@ -572,6 +628,19 @@
     }
 
     /* Bust banner */
+    @keyframes screenShake {
+      0%,100% { transform: translateX(0); }
+      10%      { transform: translateX(-10px) rotate(-.5deg); }
+      20%      { transform: translateX(10px)  rotate(.5deg); }
+      30%      { transform: translateX(-8px); }
+      40%      { transform: translateX(8px); }
+      50%      { transform: translateX(-5px); }
+      60%      { transform: translateX(5px); }
+      70%      { transform: translateX(-3px); }
+      80%      { transform: translateX(3px); }
+    }
+    .screen-shake { animation: screenShake .6s ease-in-out; }
+
     @keyframes bustBannerIn {
       0%   { transform: translate(-50%,-50%) translateY(90px) scale(0.5); opacity: 0; }
       18%  { transform: translate(-50%,-50%) translateY(-12px) scale(1.08); opacity: 1; }
@@ -917,10 +986,10 @@ function renderPlayerCard(p, i, container) {
         <button class="btn btn-blue" onclick="openBet(${i})" ${!canAct ? 'disabled style="opacity:.4"' : ''}>Bet/Raise</button>
         ${canCall
           ? `<button class="btn btn-green" onclick="playerCall(${i})">Call ${fmt(callAmt)}</button>`
-          : `<button class="btn btn-ghost" onclick="playerCheck(${i})" ${!canAct ? 'disabled style="opacity:.4"' : ''}>Check</button>`
+          : `<button class="btn btn-teal"  onclick="playerCheck(${i})" ${!canAct ? 'disabled style="opacity:.4"' : ''}>Check</button>`
         }
-        <button class="btn btn-ghost" onclick="playerFold(${i})" ${p.status !== 'active' ? 'disabled style="opacity:.4"' : ''}>Fold</button>
-        <button class="btn btn-red"   onclick="playerAllin(${i})" ${p.chips === 0 || p.status !== 'active' ? 'disabled style="opacity:.4"' : ''}>All-in</button>
+        <button class="btn btn-dark" onclick="playerFold(${i})" ${p.status !== 'active' ? 'disabled style="opacity:.4"' : ''}>Fold</button>
+        <button class="btn btn-red"  onclick="playerAllin(${i})" ${p.chips === 0 || p.status !== 'active' ? 'disabled style="opacity:.4"' : ''}>All-in</button>
       </div>
     `;
   }
@@ -946,6 +1015,25 @@ function playerFold(i) {
   p.status = 'fold';
   addLog('fold', `${p.name} folded`);
   renderGame();
+  checkAutoWin();
+}
+
+function checkAutoWin() {
+  const standing = state.players.filter(p => p.status !== 'out' && p.status !== 'fold');
+  if (standing.length !== 1 || state.pot === 0) return;
+  const winner = standing[0];
+  // Short delay so fold animation can finish rendering
+  setTimeout(() => {
+    winner.chips += state.pot;
+    if (winner.status === 'allin') winner.status = 'active';
+    addLog('win', `🏆 ${winner.name} wins ${fmt(state.pot)} — everyone else folded!`);
+    state.pot = 0;
+    state.currentBet = 0;
+    renderGame();
+    showWinAnimation(winner.name);
+    // Auto-start next hand after the animation settles
+    setTimeout(() => newHand(), 3400);
+  }, 300);
 }
 
 function playerCheck(i) {
@@ -985,31 +1073,71 @@ function playerAllin(i) {
 
 function openBet(i) {
   const p = state.players[i];
-  const minBet = Math.max(state.currentBet - p.betThisRound, 1);
+  const callAmt = Math.max(0, state.currentBet - p.betThisRound);
+  const chipDefs = [
+    {v:1,   cls:'chip-c1',   label:'1'},
+    {v:5,   cls:'chip-c5',   label:'5'},
+    {v:10,  cls:'chip-c10',  label:'10'},
+    {v:25,  cls:'chip-c25',  label:'25'},
+    {v:50,  cls:'chip-c50',  label:'50'},
+    {v:100, cls:'chip-c100', label:'100'},
+    {v:500, cls:'chip-c500', label:'500'},
+    {v:1000,cls:'chip-c1k',  label:'1K'},
+    {v:5000,cls:'chip-c5k',  label:'5K'},
+  ].filter(c => c.v <= p.chips);
+
+  const chipHTML = chipDefs.map(c =>
+    `<div class="chip-token ${c.cls}" onclick="addToBet(${c.v})">+${c.label}</div>`
+  ).join('');
+
   showModal(`
     <h3>Bet / Raise — ${escHtml(p.name)}</h3>
-    <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">Available: <strong style="color:var(--gold2)">${fmt(p.chips)}</strong></p>
-    ${state.currentBet > 0 ? `<p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">Current bet to match: ${fmt(state.currentBet - p.betThisRound)}</p>` : ''}
-    <div class="chip-quick">
-      ${[25,50,100,200,500,1000].filter(v => v <= p.chips).map(v =>
-        `<button onclick="setBetField(${v})">${fmt(v)}</button>`
-      ).join('')}
-      <button onclick="setBetField(${p.chips})">All-in (${fmt(p.chips)})</button>
+    <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:4px;">
+      <span>Stack: <strong style="color:var(--gold2)">${fmt(p.chips)}</strong></span>
+      ${callAmt > 0 ? `<span>To call: <strong style="color:#4fa8e0">${fmt(callAmt)}</strong></span>` : ''}
     </div>
-    <div class="input-row mt8">
-      <input type="number" id="bet-field" value="${minBet}" min="1" max="${p.chips}" style="font-size:1.2rem;padding:12px;" />
+    <div class="chip-strip">${chipHTML}</div>
+    <div class="bet-total-display" id="bet-total-display">0</div>
+    <div class="bet-total-label">chips to bet &nbsp;·&nbsp; <span style="cursor:pointer;color:var(--gold);text-decoration:underline;" onclick="clearBetField()">Clear</span></div>
+    <div class="input-row" style="margin-top:4px;">
+      <input type="number" id="bet-field" value="0" min="0" max="${p.chips}"
+        style="font-size:1rem;padding:10px;text-align:center;"
+        oninput="document.getElementById('bet-total-display').textContent=fmt(parseInt(this.value)||0)" />
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+      ${callAmt > 0 && callAmt <= p.chips ? `<button class="btn btn-green" style="flex:1;font-size:.85rem;" onclick="setBetExact(${callAmt})">Call ${fmt(callAmt)}</button>` : ''}
+      <button class="btn btn-ghost" style="flex:1;font-size:.85rem;" onclick="setBetExact(${Math.floor(state.pot / 2)})">½ Pot (${fmt(Math.floor(state.pot/2))})</button>
+      <button class="btn btn-ghost" style="flex:1;font-size:.85rem;" onclick="setBetExact(${state.pot})">Pot (${fmt(state.pot)})</button>
+      <button class="btn btn-red"   style="flex:1;font-size:.85rem;" onclick="setBetExact(${p.chips})">All-in</button>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-gold" onclick="confirmBet(${i})">Place Bet</button>
+      <button class="btn btn-gold"  onclick="confirmBet(${i})">Place Bet</button>
     </div>
   `);
-  setTimeout(() => { const f = document.getElementById('bet-field'); if(f) { f.select(); } }, 50);
 }
 
-function setBetField(v) {
+function addToBet(v) {
   const f = document.getElementById('bet-field');
-  if (f) { f.value = v; f.focus(); }
+  const p = state.players.find(x => x.status === 'active'); // just for cap; confirmBet validates
+  if (!f) return;
+  const cur = parseInt(f.value) || 0;
+  f.value = cur + v;
+  document.getElementById('bet-total-display').textContent = fmt(cur + v);
+}
+
+function setBetExact(v) {
+  const f = document.getElementById('bet-field');
+  if (!f) return;
+  f.value = v;
+  document.getElementById('bet-total-display').textContent = fmt(v);
+}
+
+function clearBetField() {
+  const f = document.getElementById('bet-field');
+  if (!f) return;
+  f.value = 0;
+  document.getElementById('bet-total-display').textContent = '0';
 }
 
 function confirmBet(i) {
@@ -1370,21 +1498,50 @@ function confirmAwardPot() {
   if (selected.length === 0) { alert('Select at least one winner.'); return; }
 
   const winnerIds = selected.map(el => parseInt(el.id.replace('sel-','')));
-  const share = Math.floor(state.pot / winnerIds.length);
-  const remainder = state.pot - share * winnerIds.length;
+
+  // All players who put chips in this round
+  const contributors = state.players.filter(p => p.betThisRound > 0);
+
+  // Cap = the lowest bet among winners — a player can only win as much as they put in from each opponent
+  const winnerCap = Math.min(
+    ...winnerIds.map(id => state.players.find(x => x.id === id)?.betThisRound ?? Infinity)
+  );
+
+  // Main pot = sum of min(winnerCap, each contributor's bet)
+  const mainPot = contributors.reduce((sum, p) => sum + Math.min(winnerCap, p.betThisRound), 0);
+
+  const share     = Math.floor(mainPot / winnerIds.length);
+  const remainder = mainPot - share * winnerIds.length;
 
   winnerIds.forEach((id, idx) => {
     const p = state.players.find(x => x.id === id);
     if (!p) return;
-    const gain = share + (idx === 0 ? remainder : 0); // give remainder to first winner
-    p.chips += gain;
+    const gets = share + (idx === 0 ? remainder : 0);
+    p.chips += gets;
     if (p.status === 'allin' || p.status === 'fold') p.status = 'active';
-    addLog('win', `🏆 ${p.name} won ${fmt(gain)}${winnerIds.length > 1 ? ` (split)` : ''} — now has ${fmt(p.chips)}`);
+    addLog('win', `🏆 ${p.name} won ${fmt(gets)}${winnerIds.length > 1 ? ' (split)' : ''} — now has ${fmt(p.chips)}`);
   });
 
-  const names = winnerIds.map(id => state.players.find(x=>x.id===id)?.name).filter(Boolean).join(' & ');
-  state.pot = 0;
+  state.pot -= mainPot;
+
+  // Return unmatched chips: any all-in loser who bet more than the winner's cap gets the excess back.
+  // Only when exactly one player has excess (otherwise it's a contested side pot — leave it in the pot).
+  const coveredAllIns = contributors.filter(p =>
+    !winnerIds.includes(p.id) &&
+    p.status === 'allin' &&
+    p.betThisRound > winnerCap
+  );
+  if (coveredAllIns.length === 1) {
+    const p = coveredAllIns[0];
+    const excess = p.betThisRound - winnerCap;
+    p.chips += excess;
+    p.status = 'active';
+    state.pot -= excess;
+    addLog('bet', `${p.name} got back ${fmt(excess)} unmatched chips`);
+  }
+
   state.currentBet = 0;
+  const names = winnerIds.map(id => state.players.find(x=>x.id===id)?.name).filter(Boolean).join(' & ');
   closeModal();
   renderGame();
   winnerIds.forEach(id => {
@@ -1699,65 +1856,81 @@ function backToSetup() {
 // ─────────────────────────────────────────────────────────
 // ANIMATIONS
 // ─────────────────────────────────────────────────────────
+const WIN_LINES  = [
+  'GETTING PAID 💅', 'EZ MONEY 🤑', 'SKILL DIFF 🧠', 'TOO EASY 😏',
+  'GG NO RE 😂', 'ABSOLUTE CINEMA 🎬', 'SIMPLY THE BEST 🐐',
+  'ROBBERY IN PROGRESS 🚨', 'BUILT DIFFERENT 💪', 'NOT EVEN CLOSE 😴',
+];
+const BUST_LINES = [
+  'REKT 💀', 'SKILL ISSUE 🤡', 'L + RATIO 📉', 'CRIES IN BROKE 😭',
+  'DELETED FROM THE GAME 🗑️', 'PACK IT UP 🧳', 'CLOWNED ON 🎪',
+  'TOUCHED GRASS INVOLUNTARILY 🌿', 'FINANCIALLY DECEASED 🪦', 'GIT GUD 🤣',
+];
+function randLine(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
 function showWinAnimation(names) {
   const overlay = document.createElement('div');
   overlay.className = 'anim-overlay';
 
-  const coinEmojis = ['🪙','💰','💵','🤑','💎'];
-  for (let i = 0; i < 28; i++) {
+  const coinEmojis = ['🪙','💰','💵','🤑','💎','🏆','💸'];
+  for (let i = 0; i < 32; i++) {
     const c = document.createElement('span');
     c.className = 'anim-coin';
     c.textContent = coinEmojis[Math.floor(Math.random() * coinEmojis.length)];
-    c.style.left            = `${Math.random() * 100}%`;
-    c.style.fontSize        = `${1.1 + Math.random() * 1.2}rem`;
-    c.style.animationDuration = `${1.1 + Math.random() * 1.3}s`;
-    c.style.animationDelay  = `${Math.random() * 0.8}s`;
+    c.style.left              = `${Math.random() * 105}%`;
+    c.style.fontSize          = `${1 + Math.random() * 1.4}rem`;
+    c.style.animationDuration = `${0.9 + Math.random() * 1.4}s`;
+    c.style.animationDelay    = `${Math.random() * 1}s`;
     overlay.appendChild(c);
   }
 
   const banner = document.createElement('div');
   banner.className = 'anim-win-banner';
   banner.innerHTML = `
-    <div style="font-size:2.8rem;line-height:1;">🏆</div>
-    <div style="font-size:1.5rem;font-weight:900;margin-top:8px;max-width:260px;">${escHtml(names)}</div>
-    <div style="font-size:1rem;font-weight:700;letter-spacing:.14em;margin-top:6px;opacity:.85;">WINNER!</div>
+    <div style="font-size:2.8rem;line-height:1;">🏆😏</div>
+    <div style="font-size:1.5rem;font-weight:900;margin-top:8px;max-width:280px;">${escHtml(names)}</div>
+    <div style="font-size:.95rem;font-weight:700;letter-spacing:.1em;margin-top:8px;opacity:.9;background:rgba(0,0,0,.18);border-radius:8px;padding:4px 10px;">${randLine(WIN_LINES)}</div>
   `;
   overlay.appendChild(banner);
 
   document.body.appendChild(overlay);
-  setTimeout(() => overlay.remove(), 3200);
+  setTimeout(() => overlay.remove(), 3400);
 }
 
 function showBustAnimation(name) {
   const overlay = document.createElement('div');
   overlay.className = 'anim-overlay';
 
-  const bustEmojis = ['💸','😭','😱','🪙','💔'];
-  for (let i = 0; i < 14; i++) {
+  const bustEmojis = ['💸','😭','😱','🤡','🗑️','📉','🪦','💔','😢','🌿'];
+  for (let i = 0; i < 18; i++) {
     const c = document.createElement('span');
     c.className = 'anim-bust-chip';
     c.textContent = bustEmojis[Math.floor(Math.random() * bustEmojis.length)];
-    const angle = (i / 14) * 360 + Math.random() * 26;
-    const dist  = 90 + Math.random() * 160;
+    const angle = (i / 18) * 360 + Math.random() * 20;
+    const dist  = 80 + Math.random() * 180;
     c.style.setProperty('--tx', `${Math.cos(angle * Math.PI / 180) * dist}px`);
     c.style.setProperty('--ty', `${Math.sin(angle * Math.PI / 180) * dist}px`);
-    c.style.fontSize           = `${1.1 + Math.random() * 1.1}rem`;
-    c.style.animationDuration  = `${0.9 + Math.random() * 0.5}s`;
-    c.style.animationDelay     = `${Math.random() * 0.25}s`;
+    c.style.fontSize          = `${1 + Math.random() * 1.2}rem`;
+    c.style.animationDuration = `${0.8 + Math.random() * 0.6}s`;
+    c.style.animationDelay    = `${Math.random() * 0.3}s`;
     overlay.appendChild(c);
   }
 
   const banner = document.createElement('div');
   banner.className = 'anim-bust-banner';
   banner.innerHTML = `
-    <div style="font-size:2.8rem;line-height:1;">💀</div>
-    <div style="font-size:1.4rem;font-weight:900;margin-top:8px;max-width:240px;">${escHtml(name)}</div>
-    <div style="font-size:1rem;font-weight:700;letter-spacing:.14em;margin-top:6px;opacity:.85;">IS BUSTED!</div>
+    <div style="font-size:2.8rem;line-height:1;">💀🤡</div>
+    <div style="font-size:1.4rem;font-weight:900;margin-top:8px;max-width:260px;">${escHtml(name)}</div>
+    <div style="font-size:.92rem;font-weight:700;letter-spacing:.1em;margin-top:8px;opacity:.92;background:rgba(0,0,0,.22);border-radius:8px;padding:4px 10px;">${randLine(BUST_LINES)}</div>
   `;
   overlay.appendChild(banner);
 
+  // Shake the whole page to really rub it in
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 650);
+
   document.body.appendChild(overlay);
-  setTimeout(() => overlay.remove(), 3200);
+  setTimeout(() => overlay.remove(), 3400);
 }
 
 // ─────────────────────────────────────────────────────────
