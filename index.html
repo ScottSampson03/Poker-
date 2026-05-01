@@ -1507,8 +1507,11 @@ function confirmAwardPot() {
     ...winnerIds.map(id => state.players.find(x => x.id === id)?.betThisRound ?? Infinity)
   );
 
-  // Main pot = sum of min(winnerCap, each contributor's bet)
-  const mainPot = contributors.reduce((sum, p) => sum + Math.min(winnerCap, p.betThisRound), 0);
+  // Main pot = sum of min(winnerCap, each contributor's bet), capped at what's actually in the pot
+  const mainPot = Math.min(
+    state.pot,
+    contributors.reduce((sum, p) => sum + Math.min(winnerCap, p.betThisRound), 0)
+  );
 
   const share     = Math.floor(mainPot / winnerIds.length);
   const remainder = mainPot - share * winnerIds.length;
@@ -1533,13 +1536,16 @@ function confirmAwardPot() {
   );
   if (coveredAllIns.length === 1) {
     const p = coveredAllIns[0];
-    const excess = p.betThisRound - winnerCap;
-    p.chips += excess;
-    p.status = 'active';
-    state.pot -= excess;
-    addLog('bet', `${p.name} got back ${fmt(excess)} unmatched chips`);
+    const excess = Math.min(p.betThisRound - winnerCap, state.pot); // can't return more than what's left
+    if (excess > 0) {
+      p.chips += excess;
+      p.status = 'active';
+      state.pot -= excess;
+      addLog('bet', `${p.name} got back ${fmt(excess)} unmatched chips`);
+    }
   }
 
+  state.pot = Math.max(0, state.pot); // safety net
   state.currentBet = 0;
   const names = winnerIds.map(id => state.players.find(x=>x.id===id)?.name).filter(Boolean).join(' & ');
   closeModal();
