@@ -410,20 +410,36 @@
     .overlay-bg { position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:190;display:none; }
     .overlay-bg.open { display:block; }
 
-    /* Dealer chip indicator */
-    .dealer-btn {
+    /* Dealer / blind chip indicators */
+    .dealer-btn, .blind-btn {
       display: inline-block;
-      background: var(--chip);
-      color: #1a1a1a;
-      font-size: .65rem;
+      font-size: .6rem;
       font-weight: 800;
       border-radius: 50%;
       width: 20px; height: 20px;
       line-height: 20px;
       text-align: center;
-      margin-left: 4px;
+      margin-right: 2px;
       flex-shrink: 0;
+      vertical-align: middle;
     }
+    .dealer-btn { background: var(--chip); color: #1a1a1a; }
+    .sb-btn  { background: #1a6fa8; color: #fff; }
+    .bb-btn  { background: #7b2d8b; color: #fff; }
+
+    .blinds-info-bar {
+      background: #0d2a1a;
+      border-bottom: 1px solid var(--border);
+      padding: 5px 16px;
+      font-size: .8rem;
+      color: var(--muted);
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .blinds-info-bar span { color: var(--text); font-weight: 600; }
 
     .standings-row {
       display: flex;
@@ -478,6 +494,37 @@
     </div>
   </div>
 
+  <div class="setup-card">
+    <h2>Blind Settings</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:5px;">
+          <span class="blind-btn sb-btn">SB</span> Small Blind
+        </label>
+        <input type="number" id="small-blind" value="25" min="1" style="width:100%;" oninput="syncBB()" />
+      </div>
+      <div>
+        <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:5px;">
+          <span class="blind-btn bb-btn">BB</span> Big Blind
+        </label>
+        <input type="number" id="big-blind" value="50" min="1" style="width:100%;" />
+      </div>
+    </div>
+    <div class="chip-quick">
+      <button onclick="setBlinds(5,10)">5/10</button>
+      <button onclick="setBlinds(10,20)">10/20</button>
+      <button onclick="setBlinds(25,50)">25/50</button>
+      <button onclick="setBlinds(50,100)">50/100</button>
+      <button onclick="setBlinds(100,200)">100/200</button>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="auto-post-blinds" checked style="width:17px;height:17px;accent-color:var(--gold);flex-shrink:0;" />
+      <label for="auto-post-blinds" style="font-size:.85rem;color:var(--muted);cursor:pointer;">
+        Auto-post blinds at the start of each hand
+      </label>
+    </div>
+  </div>
+
   <div style="width:100%;max-width:420px;">
     <button class="btn btn-gold btn-block" onclick="startGame()">Start Game ♠</button>
   </div>
@@ -497,6 +544,13 @@
       <button class="btn btn-ghost" style="padding:6px 10px;font-size:.8rem;" onclick="openLog()">Log</button>
       <button class="btn btn-ghost" style="padding:6px 10px;font-size:.8rem;" onclick="openStandings()">Standings</button>
     </div>
+  </div>
+
+  <!-- Blinds Info Bar -->
+  <div class="blinds-info-bar" id="blinds-info-bar">
+    <div><span class="blind-btn sb-btn">SB</span> Small Blind: <span id="sb-display">—</span></div>
+    <div><span class="blind-btn bb-btn">BB</span> Big Blind: <span id="bb-display">—</span></div>
+    <div style="cursor:pointer;color:var(--gold);text-decoration:underline;" onclick="openChangeBlinds()">Change</div>
   </div>
 
   <!-- Pot Area -->
@@ -523,7 +577,8 @@
   <div class="bottombar">
     <button class="btn btn-green" style="font-size:.85rem;padding:9px 16px;" onclick="newHand()">🃏 New Hand</button>
     <button class="btn btn-blue"  style="font-size:.85rem;padding:9px 16px;" onclick="openRebuy()">💰 Re-buy</button>
-    <button class="btn btn-ghost" style="font-size:.85rem;padding:9px 16px;" onclick="moveDealer()">🔄 Move Dealer</button>
+    <button class="btn btn-ghost" style="font-size:.85rem;padding:9px 16px;" onclick="moveDealer()">🔄 Dealer</button>
+    <button class="btn btn-ghost" style="font-size:.85rem;padding:9px 16px;" onclick="openChangeBlinds()">🪙 Blinds</button>
     <button class="btn btn-ghost" style="font-size:.85rem;padding:9px 12px;" onclick="backToSetup()">⚙</button>
   </div>
 </div>
@@ -557,6 +612,10 @@ let state = {
   currentBet: 0,        // highest bet this round
   handNumber: 1,
   dealerIndex: 0,
+  sbIndex: -1,
+  bbIndex: -1,
+  blinds: { small: 25, big: 50 },
+  autoPostBlinds: true,
   log: [],
   buyinAmount: 1000,
   totalChipsInPlay: 0,
@@ -569,6 +628,16 @@ let setupPlayers = [];  // temp for setup
 // ─────────────────────────────────────────────────────────
 function setBuyin(v) {
   document.getElementById('buyin-amount').value = v;
+}
+
+function setBlinds(sb, bb) {
+  document.getElementById('small-blind').value = sb;
+  document.getElementById('big-blind').value = bb;
+}
+
+function syncBB() {
+  const sb = parseInt(document.getElementById('small-blind').value) || 0;
+  document.getElementById('big-blind').value = sb * 2;
 }
 
 function addPlayer() {
@@ -623,6 +692,13 @@ function startGame() {
   state.currentBet = 0;
   state.handNumber = 1;
   state.dealerIndex = 0;
+  state.sbIndex = -1;
+  state.bbIndex = -1;
+  state.blinds = {
+    small: parseInt(document.getElementById('small-blind').value) || 25,
+    big:   parseInt(document.getElementById('big-blind').value)   || 50,
+  };
+  state.autoPostBlinds = document.getElementById('auto-post-blinds').checked;
   state.log = [];
   state.totalChipsInPlay = buyin * setupPlayers.length;
 
@@ -630,6 +706,8 @@ function startGame() {
 
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('game-screen').style.display = 'flex';
+
+  if (state.autoPostBlinds) postBlinds();
   renderGame();
 }
 
@@ -641,6 +719,14 @@ function renderGame() {
   const activePlayers = state.players.filter(p => p.status !== 'out');
   document.getElementById('topbar-meta').textContent =
     `Hand #${state.handNumber} · ${activePlayers.length} players active`;
+
+  // Blinds info bar
+  const sbPlayer = state.players[state.sbIndex];
+  const bbPlayer = state.players[state.bbIndex];
+  document.getElementById('sb-display').textContent =
+    `${fmt(state.blinds.small)}${sbPlayer ? ' · ' + sbPlayer.name : ''}`;
+  document.getElementById('bb-display').textContent =
+    `${fmt(state.blinds.big)}${bbPlayer ? ' · ' + bbPlayer.name : ''}`;
 
   // Pot
   document.getElementById('pot-display').textContent = fmt(state.pot);
@@ -662,6 +748,8 @@ function renderGame() {
 
 function renderPlayerCard(p, i, container) {
   const isDealer = i === state.dealerIndex;
+  const isSB = i === state.sbIndex;
+  const isBB = i === state.bbIndex;
   const card = document.createElement('div');
   card.className = 'player-card' +
     (p.status === 'fold' ? ' folded' : '') +
@@ -702,7 +790,7 @@ function renderPlayerCard(p, i, container) {
   card.innerHTML = `
     ${badgeHTML}
     <div class="player-name">
-      ${isDealer ? '<span class="dealer-btn">D</span> ' : ''}${escHtml(p.name)}
+      ${isDealer ? '<span class="dealer-btn">D</span>' : ''}${isSB ? '<span class="blind-btn sb-btn">SB</span>' : ''}${isBB ? '<span class="blind-btn bb-btn">BB</span>' : ''} ${escHtml(p.name)}
     </div>
     <div class="player-chips${chipClass}">${fmt(p.chips)}</div>
     <div class="player-bet-row">${betInfo}</div>
@@ -957,17 +1045,136 @@ function newHand() {
   }
   state.handNumber++;
   state.currentBet = 0;
+  state.sbIndex = -1;
+  state.bbIndex = -1;
   state.players.forEach(p => {
     p.betThisRound = 0;
     if (p.status !== 'out') {
-      if (p.chips === 0) {
-        p.status = 'out'; // eliminated
-      } else {
-        p.status = 'active';
-      }
+      if (p.chips === 0) p.status = 'out';
+      else p.status = 'active';
     }
   });
-  addLog('new-hand', `═══ Hand #${state.handNumber} started ═══`);
+  // Advance dealer to next active player
+  state.dealerIndex = nextActiveIndex(state.dealerIndex);
+  addLog('new-hand', `═══ Hand #${state.handNumber} — Dealer: ${state.players[state.dealerIndex].name} ═══`);
+  if (state.autoPostBlinds) postBlinds();
+  renderGame();
+}
+
+// ─────────────────────────────────────────────────────────
+// BLIND LOGIC
+// ─────────────────────────────────────────────────────────
+function nextActiveIndex(fromIndex) {
+  const n = state.players.length;
+  let idx = (fromIndex + 1) % n;
+  for (let i = 0; i < n; i++) {
+    if (state.players[idx].status !== 'out') return idx;
+    idx = (idx + 1) % n;
+  }
+  return fromIndex;
+}
+
+function computeBlindPositions() {
+  const active = state.players.filter(p => p.status !== 'out');
+  if (active.length < 2) return;
+  if (active.length === 2) {
+    // Heads-up: dealer posts SB, other player posts BB
+    state.sbIndex = state.dealerIndex;
+    state.bbIndex = nextActiveIndex(state.dealerIndex);
+  } else {
+    state.sbIndex = nextActiveIndex(state.dealerIndex);
+    state.bbIndex = nextActiveIndex(state.sbIndex);
+  }
+}
+
+function postBlinds() {
+  computeBlindPositions();
+  if (state.sbIndex < 0 || state.bbIndex < 0) return;
+
+  const sb = state.players[state.sbIndex];
+  const bb = state.players[state.bbIndex];
+  const sbAmt = Math.min(state.blinds.small, sb.chips);
+  const bbAmt = Math.min(state.blinds.big,   bb.chips);
+
+  sb.chips -= sbAmt;
+  sb.betThisRound += sbAmt;
+  state.pot += sbAmt;
+  if (sb.chips === 0) sb.status = 'allin';
+
+  bb.chips -= bbAmt;
+  bb.betThisRound += bbAmt;
+  state.pot += bbAmt;
+  if (bb.chips === 0) bb.status = 'allin';
+
+  // Current bet is the BB amount (SB still owes the difference)
+  state.currentBet = bbAmt;
+
+  addLog('bet', `Blinds posted — ${sb.name} SB: ${fmt(sbAmt)}, ${bb.name} BB: ${fmt(bbAmt)} (pot: ${fmt(state.pot)})`);
+}
+
+function openChangeBlinds() {
+  showModal(`
+    <h3>🪙 Change Blind Levels</h3>
+    <p class="modal-note">Update blinds for the next hand, or re-post immediately.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 10px;">
+      <div>
+        <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:5px;">
+          <span class="blind-btn sb-btn">SB</span> Small Blind
+        </label>
+        <input type="number" id="change-sb" value="${state.blinds.small}" min="1"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:1rem;"
+          oninput="document.getElementById('change-bb').value=parseInt(this.value||0)*2" />
+      </div>
+      <div>
+        <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:5px;">
+          <span class="blind-btn bb-btn">BB</span> Big Blind
+        </label>
+        <input type="number" id="change-bb" value="${state.blinds.big}" min="1"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:1rem;" />
+      </div>
+    </div>
+    <div class="chip-quick">
+      <button onclick="setChangeBlinds(5,10)">5/10</button>
+      <button onclick="setChangeBlinds(10,20)">10/20</button>
+      <button onclick="setChangeBlinds(25,50)">25/50</button>
+      <button onclick="setChangeBlinds(50,100)">50/100</button>
+      <button onclick="setChangeBlinds(100,200)">100/200</button>
+      <button onclick="setChangeBlinds(200,400)">200/400</button>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="change-auto" ${state.autoPostBlinds?'checked':''} style="width:17px;height:17px;accent-color:var(--gold);flex-shrink:0;" />
+      <label for="change-auto" style="font-size:.85rem;color:var(--muted);cursor:pointer;">Auto-post blinds each hand</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-green" onclick="confirmChangeBlinds(false)">Save for Next Hand</button>
+      <button class="btn btn-gold"  onclick="confirmChangeBlinds(true)">Save &amp; Post Now</button>
+    </div>
+  `);
+}
+
+function setChangeBlinds(sb, bb) {
+  const sf = document.getElementById('change-sb');
+  const bf = document.getElementById('change-bb');
+  if (sf) sf.value = sb;
+  if (bf) bf.value = bb;
+}
+
+function confirmChangeBlinds(postNow) {
+  const sb = parseInt(document.getElementById('change-sb').value) || state.blinds.small;
+  const bb = parseInt(document.getElementById('change-bb').value) || state.blinds.big;
+  if (sb >= bb) { alert('Big blind must be greater than the small blind.'); return; }
+  state.blinds.small = sb;
+  state.blinds.big   = bb;
+  state.autoPostBlinds = document.getElementById('change-auto').checked;
+  addLog('new-hand', `Blinds changed to ${fmt(sb)}/${fmt(bb)}`);
+  closeModal();
+  if (postNow) {
+    // Reset bets first so blinds post cleanly
+    state.currentBet = 0;
+    state.players.forEach(p => { p.betThisRound = 0; });
+    postBlinds();
+  }
   renderGame();
 }
 
