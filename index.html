@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Poker Chip Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #1a5c2a;
+      --green2:  #246b35;
+      --felt:    #0f3d1c;
+      --gold:    #d4a017;
+      --gold2:   #f0c040;
+      --red:     #c0392b;
+      --blue:    #1a6fa8;
+      --chip:    #e8e0d0;
+      --bg:      #0a2010;
+      --card-bg: #162e1e;
+      --text:    #e8e0d0;
+      --muted:   #8aaa8a;
+      --border:  #2a6040;
+      --radius:  12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ── SETUP SCREEN ─────────────────────────────────────── */
+    #setup-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+      min-height: 100dvh;
+    }
+
+    .logo {
+      font-size: 2.4rem;
+      margin-bottom: 4px;
+      filter: drop-shadow(0 2px 8px rgba(212,160,23,.4));
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--gold2);
+      letter-spacing: .04em;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .tagline {
+      font-size: .85rem;
+      color: var(--muted);
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .setup-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 16px;
+    }
+
+    .setup-card h2 {
+      font-size: .95rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 14px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    input[type="text"], input[type="number"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 10px 14px;
+      flex: 1;
+      outline: none;
+      transition: border-color .2s;
+      -webkit-appearance: none;
+    }
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--gold);
+    }
+    input[type="number"] { width: 110px; flex: none; }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .95rem;
+      font-weight: 600;
+      padding: 10px 18px;
+      transition: filter .15s, transform .1s;
+      letter-spacing: .02em;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-gold  { background: var(--gold); color: #111; }
+    .btn-gold:hover  { filter: brightness(1.12); }
+    .btn-green { background: var(--green2); color: var(--text); }
+    .btn-green:hover { filter: brightness(1.15); }
+    .btn-red   { background: var(--red); color: #fff; }
+    .btn-red:hover   { filter: brightness(1.15); }
+    .btn-blue  { background: var(--blue); color: #fff; }
+    .btn-blue:hover  { filter: brightness(1.15); }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+    .btn-block { width: 100%; display: block; padding: 13px; font-size: 1.05rem; }
+
+    .player-tag {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 7px;
+      font-size: .95rem;
+    }
+    .player-tag .remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 1.1rem; padding: 0 4px; }
+
+    .buyin-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .buyin-row label { color: var(--muted); font-size: .9rem; }
+    .buyin-row input { width: 120px; }
+
+    /* ── GAME SCREEN ──────────────────────────────────────── */
+    #game-screen { display: none; flex-direction: column; min-height: 100dvh; }
+
+    /* Top Bar */
+    .topbar {
+      background: var(--felt);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-title { font-size: 1rem; font-weight: 700; color: var(--gold2); }
+    .topbar-meta  { font-size: .8rem; color: var(--muted); }
+    .topbar-right { display: flex; gap: 8px; align-items: center; }
+
+    /* Pot Area */
+    .pot-area {
+      background: linear-gradient(135deg, var(--green) 0%, var(--felt) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 16px 14px;
+      text-align: center;
+    }
+    .pot-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 4px; }
+    .pot-amount {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: var(--gold2);
+      line-height: 1;
+      letter-spacing: -.02em;
+      text-shadow: 0 2px 12px rgba(212,160,23,.5);
+      margin-bottom: 10px;
+    }
+    .pot-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+    /* Current Bet Banner */
+    .bet-banner {
+      background: var(--blue);
+      padding: 6px 16px;
+      font-size: .85rem;
+      text-align: center;
+      display: none;
+    }
+    .bet-banner.active { display: block; }
+
+    /* Players Grid */
+    .players-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      padding: 12px;
+      flex: 1;
+    }
+
+    .player-card {
+      background: var(--card-bg);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .player-card.active-turn { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+    .player-card.folded { opacity: .5; }
+    .player-card.allin  { border-color: var(--red); }
+    .player-card.winner { border-color: #4caf50; box-shadow: 0 0 12px rgba(76,175,80,.4); }
+    .player-card.eliminated { opacity: .35; border-style: dashed; }
+
+    .player-status-badge {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 2px 6px;
+      border-radius: 999px;
+    }
+    .badge-fold   { background: #555; color: #ccc; }
+    .badge-allin  { background: var(--red); color: #fff; }
+    .badge-active { background: var(--gold); color: #111; }
+    .badge-out    { background: #333; color: #888; }
+    .badge-dealer { background: var(--green2); color: var(--gold2); }
+
+    .player-name {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 48px;
+    }
+    .player-chips {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--gold2);
+      line-height: 1;
+      letter-spacing: -.02em;
+    }
+    .player-chips.low  { color: var(--red); }
+    .player-chips.zero { color: #666; }
+
+    .player-bet-row {
+      font-size: .75rem;
+      color: var(--muted);
+      min-height: 14px;
+    }
+
+    .player-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    .player-actions .btn {
+      font-size: .78rem;
+      padding: 7px 4px;
+      border-radius: 6px;
+    }
+    .player-actions .btn-wide {
+      grid-column: span 2;
+    }
+
+    /* Bottom Bar */
+    .bottombar {
+      background: var(--felt);
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── LOG PANEL ────────────────────────────────────────── */
+    #log-panel {
+      position: fixed;
+      right: 0; top: 0; bottom: 0;
+      width: min(340px, 100vw);
+      background: #0d1f12;
+      border-left: 1px solid var(--border);
+      transform: translateX(100%);
+      transition: transform .25s ease;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+    }
+    #log-panel.open { transform: translateX(0); }
+    .log-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--felt);
+    }
+    .log-header h3 { font-size: 1rem; color: var(--gold); }
+    .log-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 10px;
+    }
+    .log-entry {
+      font-size: .8rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-bottom: 5px;
+      border-left: 3px solid var(--border);
+      background: var(--card-bg);
+      color: var(--muted);
+    }
+    .log-entry .log-time { font-size: .7rem; opacity: .6; }
+    .log-entry.win  { border-left-color: #4caf50; color: var(--text); }
+    .log-entry.bet  { border-left-color: var(--blue); }
+    .log-entry.fold { border-left-color: #555; }
+    .log-entry.new-hand { border-left-color: var(--gold); color: var(--gold); font-weight: 600; }
+
+    /* ── MODAL ────────────────────────────────────────────── */
+    #modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 380px;
+      max-height: 90dvh;
+      overflow-y: auto;
+    }
+    .modal h3 { font-size: 1.1rem; color: var(--gold2); margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .modal-actions .btn { flex: 1; min-width: 100px; }
+    .chip-quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    .chip-quick button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--gold);
+      cursor: pointer;
+      font-size: .85rem;
+      padding: 6px 12px;
+      transition: all .15s;
+    }
+    .chip-quick button:hover { border-color: var(--gold); background: var(--felt); }
+    .player-select-list { margin: 10px 0; }
+    .player-select-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      margin-bottom: 7px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .player-select-item:hover { border-color: var(--gold); }
+    .player-select-item.selected { border-color: #4caf50; background: #0a2510; }
+    .player-select-item input[type="checkbox"] { accent-color: #4caf50; width: 18px; height: 18px; }
+    .player-select-info { flex: 1; }
+    .player-select-name { font-size: .95rem; font-weight: 600; }
+    .player-select-chips { font-size: .8rem; color: var(--muted); }
+    .split-pct { font-size: .75rem; color: var(--gold); margin-left: auto; }
+    .modal-note { font-size: .8rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+    /* ── RESPONSIVE ───────────────────────────────────────── */
+    @media (min-width: 600px) {
+      .players-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 16px; }
+    }
+    @media (max-width: 400px) {
+      .players-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+      .player-chips { font-size: 1.35rem; }
+    }
+
+    /* ── UTILITIES ────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mt8 { margin-top: 8px; }
+    .mt12 { margin-top: 12px; }
+    .overlay-bg { position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:190;display:none; }
+    .overlay-bg.open { display:block; }
+
+    /* Dealer chip indicator */
+    .dealer-btn {
+      display: inline-block;
+      background: var(--chip);
+      color: #1a1a1a;
+      font-size: .65rem;
+      font-weight: 800;
+      border-radius: 50%;
+      width: 20px; height: 20px;
+      line-height: 20px;
+      text-align: center;
+      margin-left: 4px;
+      flex-shrink: 0;
+    }
+
+    .standings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .standings-rank { font-size: .85rem; color: var(--muted); width: 24px; }
+    .standings-name { flex: 1; font-size: .95rem; }
+    .standings-chips { font-size: 1rem; font-weight: 700; color: var(--gold2); }
+    .standings-delta { font-size: .8rem; margin-left: 8px; }
+    .delta-pos { color: #4caf50; }
+    .delta-neg { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     SETUP SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="setup-screen">
+  <div class="logo">♠️</div>
+  <h1>Poker Chip Tracker</h1>
+  <p class="tagline">No physical chips? No problem. Track everything here.</p>
+
+  <div class="setup-card">
+    <h2>Add Players</h2>
+    <div class="input-row">
+      <input type="text" id="player-name-input" placeholder="Player name" maxlength="20" autocomplete="off" />
+      <button class="btn btn-gold" onclick="addPlayer()">Add</button>
+    </div>
+    <div id="player-list"></div>
+    <p id="player-hint" style="font-size:.8rem;color:var(--muted);margin-top:6px;">Add 2–10 players to begin.</p>
+  </div>
+
+  <div class="setup-card">
+    <h2>Buy-In Settings</h2>
+    <div class="buyin-row">
+      <label>Starting chips per player:</label>
+      <input type="number" id="buyin-amount" value="1000" min="10" max="1000000" step="10" />
+    </div>
+    <div class="chip-quick mt8">
+      <button onclick="setBuyin(500)">500</button>
+      <button onclick="setBuyin(1000)">1,000</button>
+      <button onclick="setBuyin(1500)">1,500</button>
+      <button onclick="setBuyin(5000)">5,000</button>
+      <button onclick="setBuyin(10000)">10,000</button>
+    </div>
+  </div>
+
+  <div style="width:100%;max-width:420px;">
+    <button class="btn btn-gold btn-block" onclick="startGame()">Start Game ♠</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     GAME SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="game-screen">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">♠ Poker Tracker</div>
+      <div class="topbar-meta" id="topbar-meta">Hand #1</div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" style="padding:6px 10px;font-size:.8rem;" onclick="openLog()">Log</button>
+      <button class="btn btn-ghost" style="padding:6px 10px;font-size:.8rem;" onclick="openStandings()">Standings</button>
+    </div>
+  </div>
+
+  <!-- Pot Area -->
+  <div class="pot-area">
+    <div class="pot-label">Total Pot</div>
+    <div class="pot-amount" id="pot-display">0</div>
+    <div class="pot-actions">
+      <button class="btn btn-gold" style="font-size:.9rem;padding:9px 18px;" onclick="openAwardPot()">🏆 Award Pot</button>
+      <button class="btn btn-ghost" style="font-size:.9rem;padding:9px 14px;" onclick="openAddToPot()">+ Add to Pot</button>
+    </div>
+  </div>
+
+  <!-- Current Bet Banner -->
+  <div class="bet-banner" id="bet-banner">
+    Current bet to call: <strong id="current-bet-display">0</strong>
+    &nbsp;·&nbsp;
+    <span style="cursor:pointer;text-decoration:underline;" onclick="clearCurrentBet()">Clear</span>
+  </div>
+
+  <!-- Players Grid -->
+  <div class="players-grid" id="players-grid"></div>
+
+  <!-- Bottom Bar -->
+  <div class="bottombar">
+    <button class="btn btn-green" style="font-size:.85rem;padding:9px 16px;" onclick="newHand()">🃏 New Hand</button>
+    <button class="btn btn-blue"  style="font-size:.85rem;padding:9px 16px;" onclick="openRebuy()">💰 Re-buy</button>
+    <button class="btn btn-ghost" style="font-size:.85rem;padding:9px 16px;" onclick="moveDealer()">🔄 Move Dealer</button>
+    <button class="btn btn-ghost" style="font-size:.85rem;padding:9px 12px;" onclick="backToSetup()">⚙</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOG PANEL
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="log-overlay" onclick="closeLog()"></div>
+<div id="log-panel">
+  <div class="log-header">
+    <h3>Transaction Log</h3>
+    <button class="btn btn-ghost" style="padding:5px 10px;font-size:.8rem;" onclick="closeLog()">✕</button>
+  </div>
+  <div class="log-list" id="log-list"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL
+═══════════════════════════════════════════════════════ -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────
+let state = {
+  players: [],          // { id, name, chips, status:'active'|'fold'|'allin'|'out', betThisRound, startChips }
+  pot: 0,
+  currentBet: 0,        // highest bet this round
+  handNumber: 1,
+  dealerIndex: 0,
+  log: [],
+  buyinAmount: 1000,
+  totalChipsInPlay: 0,
+};
+
+let setupPlayers = [];  // temp for setup
+
+// ─────────────────────────────────────────────────────────
+// SETUP
+// ─────────────────────────────────────────────────────────
+function setBuyin(v) {
+  document.getElementById('buyin-amount').value = v;
+}
+
+function addPlayer() {
+  const inp = document.getElementById('player-name-input');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  if (setupPlayers.length >= 10) { alert('Maximum 10 players.'); return; }
+  if (setupPlayers.find(p => p.toLowerCase() === name.toLowerCase())) {
+    alert('Name already added.'); return;
+  }
+  setupPlayers.push(name);
+  inp.value = '';
+  inp.focus();
+  renderSetupList();
+}
+
+function removeSetupPlayer(i) {
+  setupPlayers.splice(i, 1);
+  renderSetupList();
+}
+
+function renderSetupList() {
+  const list = document.getElementById('player-list');
+  const hint = document.getElementById('player-hint');
+  list.innerHTML = '';
+  setupPlayers.forEach((name, i) => {
+    const el = document.createElement('div');
+    el.className = 'player-tag';
+    el.innerHTML = `<span>🪙 ${name}</span><button class="remove" onclick="removeSetupPlayer(${i})">✕</button>`;
+    list.appendChild(el);
+  });
+  hint.style.display = setupPlayers.length === 0 ? 'block' : 'none';
+}
+
+document.getElementById('player-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addPlayer();
+});
+
+function startGame() {
+  if (setupPlayers.length < 2) { alert('Add at least 2 players to start.'); return; }
+  const buyin = parseInt(document.getElementById('buyin-amount').value) || 1000;
+  state.buyinAmount = buyin;
+  state.players = setupPlayers.map((name, i) => ({
+    id: i,
+    name,
+    chips: buyin,
+    status: 'active',
+    betThisRound: 0,
+    startChips: buyin,
+  }));
+  state.pot = 0;
+  state.currentBet = 0;
+  state.handNumber = 1;
+  state.dealerIndex = 0;
+  state.log = [];
+  state.totalChipsInPlay = buyin * setupPlayers.length;
+
+  addLog('new-hand', `Game started — ${setupPlayers.length} players, ${fmt(buyin)} chips each`);
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+  renderGame();
+}
+
+// ─────────────────────────────────────────────────────────
+// RENDER GAME
+// ─────────────────────────────────────────────────────────
+function renderGame() {
+  // Topbar
+  const activePlayers = state.players.filter(p => p.status !== 'out');
+  document.getElementById('topbar-meta').textContent =
+    `Hand #${state.handNumber} · ${activePlayers.length} players active`;
+
+  // Pot
+  document.getElementById('pot-display').textContent = fmt(state.pot);
+
+  // Bet banner
+  const banner = document.getElementById('bet-banner');
+  if (state.currentBet > 0) {
+    banner.classList.add('active');
+    document.getElementById('current-bet-display').textContent = fmt(state.currentBet);
+  } else {
+    banner.classList.remove('active');
+  }
+
+  // Players grid
+  const grid = document.getElementById('players-grid');
+  grid.innerHTML = '';
+  state.players.forEach((p, i) => renderPlayerCard(p, i, grid));
+}
+
+function renderPlayerCard(p, i, container) {
+  const isDealer = i === state.dealerIndex;
+  const card = document.createElement('div');
+  card.className = 'player-card' +
+    (p.status === 'fold' ? ' folded' : '') +
+    (p.status === 'allin' ? ' allin' : '') +
+    (p.status === 'out' ? ' eliminated' : '');
+  card.id = `card-${p.id}`;
+
+  const chipClass = p.chips === 0 ? ' zero' : p.chips < state.buyinAmount * 0.2 ? ' low' : '';
+
+  let badgeHTML = '';
+  if (p.status === 'fold')   badgeHTML = '<span class="player-status-badge badge-fold">Folded</span>';
+  if (p.status === 'allin')  badgeHTML = '<span class="player-status-badge badge-allin">ALL IN</span>';
+  if (p.status === 'out')    badgeHTML = '<span class="player-status-badge badge-out">Out</span>';
+
+  const betInfo = p.betThisRound > 0
+    ? `Bet this round: ${fmt(p.betThisRound)}`
+    : '&nbsp;';
+
+  let actionsHTML = '';
+  if (p.status !== 'out') {
+    const canAct = p.status === 'active';
+    const callAmt = Math.max(0, state.currentBet - p.betThisRound);
+    const canCall = canAct && callAmt > 0 && callAmt <= p.chips;
+
+    actionsHTML = `
+      <div class="player-actions">
+        <button class="btn btn-blue" onclick="openBet(${i})" ${!canAct ? 'disabled style="opacity:.4"' : ''}>Bet/Raise</button>
+        ${canCall
+          ? `<button class="btn btn-green" onclick="playerCall(${i})">Call ${fmt(callAmt)}</button>`
+          : `<button class="btn btn-ghost" onclick="playerCheck(${i})" ${!canAct ? 'disabled style="opacity:.4"' : ''}>Check</button>`
+        }
+        <button class="btn btn-ghost" onclick="playerFold(${i})" ${p.status !== 'active' ? 'disabled style="opacity:.4"' : ''}>Fold</button>
+        <button class="btn btn-red"   onclick="playerAllin(${i})" ${p.chips === 0 || p.status !== 'active' ? 'disabled style="opacity:.4"' : ''}>All-in</button>
+      </div>
+    `;
+  }
+
+  card.innerHTML = `
+    ${badgeHTML}
+    <div class="player-name">
+      ${isDealer ? '<span class="dealer-btn">D</span> ' : ''}${escHtml(p.name)}
+    </div>
+    <div class="player-chips${chipClass}">${fmt(p.chips)}</div>
+    <div class="player-bet-row">${betInfo}</div>
+    ${actionsHTML}
+  `;
+
+  container.appendChild(card);
+}
+
+// ─────────────────────────────────────────────────────────
+// PLAYER ACTIONS
+// ─────────────────────────────────────────────────────────
+function playerFold(i) {
+  const p = state.players[i];
+  p.status = 'fold';
+  addLog('fold', `${p.name} folded`);
+  renderGame();
+}
+
+function playerCheck(i) {
+  const p = state.players[i];
+  if (state.currentBet > p.betThisRound) {
+    alert(`There's a bet of ${fmt(state.currentBet)} to call. Use "Call" or "Fold".`);
+    return;
+  }
+  addLog('bet', `${p.name} checked`);
+  // no chip movement
+}
+
+function playerCall(i) {
+  const p = state.players[i];
+  const callAmt = Math.min(state.currentBet - p.betThisRound, p.chips);
+  if (callAmt <= 0) return;
+  p.chips -= callAmt;
+  p.betThisRound += callAmt;
+  state.pot += callAmt;
+  if (p.chips === 0) p.status = 'allin';
+  addLog('bet', `${p.name} called ${fmt(callAmt)} (pot: ${fmt(state.pot)})`);
+  renderGame();
+}
+
+function playerAllin(i) {
+  const p = state.players[i];
+  if (p.chips === 0) return;
+  const amt = p.chips;
+  p.betThisRound += amt;
+  state.pot += amt;
+  p.chips = 0;
+  p.status = 'allin';
+  if (p.betThisRound > state.currentBet) state.currentBet = p.betThisRound;
+  addLog('bet', `${p.name} went ALL-IN for ${fmt(amt)} (pot: ${fmt(state.pot)})`);
+  renderGame();
+}
+
+function openBet(i) {
+  const p = state.players[i];
+  const minBet = Math.max(state.currentBet - p.betThisRound, 1);
+  showModal(`
+    <h3>Bet / Raise — ${escHtml(p.name)}</h3>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">Available: <strong style="color:var(--gold2)">${fmt(p.chips)}</strong></p>
+    ${state.currentBet > 0 ? `<p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">Current bet to match: ${fmt(state.currentBet - p.betThisRound)}</p>` : ''}
+    <div class="chip-quick">
+      ${[25,50,100,200,500,1000].filter(v => v <= p.chips).map(v =>
+        `<button onclick="setBetField(${v})">${fmt(v)}</button>`
+      ).join('')}
+      <button onclick="setBetField(${p.chips})">All-in (${fmt(p.chips)})</button>
+    </div>
+    <div class="input-row mt8">
+      <input type="number" id="bet-field" value="${minBet}" min="1" max="${p.chips}" style="font-size:1.2rem;padding:12px;" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmBet(${i})">Place Bet</button>
+    </div>
+  `);
+  setTimeout(() => { const f = document.getElementById('bet-field'); if(f) { f.select(); } }, 50);
+}
+
+function setBetField(v) {
+  const f = document.getElementById('bet-field');
+  if (f) { f.value = v; f.focus(); }
+}
+
+function confirmBet(i) {
+  const p = state.players[i];
+  const amt = parseInt(document.getElementById('bet-field').value) || 0;
+  if (amt <= 0) { alert('Enter a valid bet amount.'); return; }
+  if (amt > p.chips) { alert(`${p.name} only has ${fmt(p.chips)} chips.`); return; }
+
+  const totalBet = p.betThisRound + amt;
+  p.chips -= amt;
+  p.betThisRound = totalBet;
+  state.pot += amt;
+  if (totalBet > state.currentBet) state.currentBet = totalBet;
+  if (p.chips === 0) p.status = 'allin';
+
+  addLog('bet', `${p.name} bet ${fmt(amt)} (total bet: ${fmt(totalBet)}, pot: ${fmt(state.pot)})`);
+  closeModal();
+  renderGame();
+}
+
+// ─────────────────────────────────────────────────────────
+// POT MANAGEMENT
+// ─────────────────────────────────────────────────────────
+function openAddToPot() {
+  showModal(`
+    <h3>Add Chips to Pot</h3>
+    <p class="modal-note">Manually add any amount to the pot (e.g. blinds, antes).</p>
+    <div class="chip-quick mt8">
+      ${[5,10,25,50,100,200].map(v =>
+        `<button onclick="addToPotAmount(${v})">${fmt(v)}</button>`
+      ).join('')}
+    </div>
+    <div class="input-row mt8">
+      <input type="number" id="pot-add-field" placeholder="Amount" min="1" style="font-size:1.1rem;padding:10px;" />
+      <select id="pot-add-player" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:.9rem;">
+        <option value="">— Any player —</option>
+        ${state.players.filter(p=>p.status!=='out').map(p =>
+          `<option value="${p.id}">${escHtml(p.name)} (${fmt(p.chips)})</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold"  onclick="confirmAddToPot()">Add</button>
+    </div>
+  `);
+}
+
+function addToPotAmount(v) {
+  const f = document.getElementById('pot-add-field');
+  if (f) { f.value = (parseInt(f.value)||0) + v; }
+}
+
+function confirmAddToPot() {
+  const amt = parseInt(document.getElementById('pot-add-field').value) || 0;
+  const pid = document.getElementById('pot-add-player').value;
+  if (amt <= 0) { alert('Enter an amount.'); return; }
+
+  if (pid !== '') {
+    const p = state.players.find(x => x.id === parseInt(pid));
+    if (p) {
+      if (amt > p.chips) { alert(`${p.name} only has ${fmt(p.chips)}.`); return; }
+      p.chips -= amt;
+      p.betThisRound += amt;
+      if (p.betThisRound > state.currentBet) state.currentBet = p.betThisRound;
+      if (p.chips === 0) p.status = 'allin';
+      addLog('bet', `${p.name} put ${fmt(amt)} in pot`);
+    }
+  } else {
+    addLog('bet', `${fmt(amt)} added to pot`);
+  }
+  state.pot += amt;
+  closeModal();
+  renderGame();
+}
+
+function openAwardPot() {
+  if (state.pot === 0) { alert('The pot is empty.'); return; }
+  const eligible = state.players.filter(p => p.status !== 'out' && p.status !== 'fold');
+  if (eligible.length === 0) {
+    // All folded — show all non-out players
+    const all = state.players.filter(p => p.status !== 'out');
+    showAwardModal(all);
+  } else {
+    showAwardModal(eligible);
+  }
+}
+
+function showAwardModal(candidates) {
+  const listHTML = candidates.map(p => `
+    <div class="player-select-item" id="sel-${p.id}" onclick="toggleWinner(${p.id})">
+      <input type="checkbox" id="chk-${p.id}" />
+      <div class="player-select-info">
+        <div class="player-select-name">${escHtml(p.name)}</div>
+        <div class="player-select-chips">${fmt(p.chips)} chips</div>
+      </div>
+      <span class="split-pct" id="split-${p.id}"></span>
+    </div>
+  `).join('');
+
+  showModal(`
+    <h3>🏆 Award Pot: ${fmt(state.pot)}</h3>
+    <p class="modal-note">Select winner(s). If multiple selected, pot is split evenly.</p>
+    <div class="player-select-list">${listHTML}</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold"  onclick="confirmAwardPot()">Award</button>
+    </div>
+  `);
+}
+
+function toggleWinner(id) {
+  const chk = document.getElementById(`chk-${id}`);
+  const item = document.getElementById(`sel-${id}`);
+  chk.checked = !chk.checked;
+  item.classList.toggle('selected', chk.checked);
+  // update split percentages
+  const selected = document.querySelectorAll('.player-select-item.selected');
+  const count = selected.length;
+  document.querySelectorAll('[id^="split-"]').forEach(el => { el.textContent = ''; });
+  if (count > 1) {
+    selected.forEach(el => {
+      const sid = el.id.replace('sel-','');
+      const sp = document.getElementById(`split-${sid}`);
+      if (sp) sp.textContent = `÷${count} = ${fmt(Math.floor(state.pot/count))}`;
+    });
+  }
+}
+
+function confirmAwardPot() {
+  const selected = [...document.querySelectorAll('.player-select-item.selected')];
+  if (selected.length === 0) { alert('Select at least one winner.'); return; }
+
+  const winnerIds = selected.map(el => parseInt(el.id.replace('sel-','')));
+  const share = Math.floor(state.pot / winnerIds.length);
+  const remainder = state.pot - share * winnerIds.length;
+
+  winnerIds.forEach((id, idx) => {
+    const p = state.players.find(x => x.id === id);
+    if (!p) return;
+    const gain = share + (idx === 0 ? remainder : 0); // give remainder to first winner
+    p.chips += gain;
+    if (p.status === 'allin' || p.status === 'fold') p.status = 'active';
+    addLog('win', `🏆 ${p.name} won ${fmt(gain)}${winnerIds.length > 1 ? ` (split)` : ''} — now has ${fmt(p.chips)}`);
+  });
+
+  const names = winnerIds.map(id => state.players.find(x=>x.id===id)?.name).filter(Boolean).join(' & ');
+  state.pot = 0;
+  state.currentBet = 0;
+  closeModal();
+  renderGame();
+  // brief winner flash
+  winnerIds.forEach(id => {
+    const card = document.getElementById(`card-${id}`);
+    if (card) { card.classList.add('winner'); setTimeout(()=>card.classList.remove('winner'), 2000); }
+  });
+}
+
+function clearCurrentBet() {
+  state.currentBet = 0;
+  state.players.forEach(p => { p.betThisRound = 0; });
+  renderGame();
+}
+
+// ─────────────────────────────────────────────────────────
+// HAND MANAGEMENT
+// ─────────────────────────────────────────────────────────
+function newHand() {
+  if (state.pot > 0) {
+    if (!confirm(`There are ${fmt(state.pot)} chips still in the pot. Award them before starting a new hand, or click OK to carry over.`)) return;
+  }
+  state.handNumber++;
+  state.currentBet = 0;
+  state.players.forEach(p => {
+    p.betThisRound = 0;
+    if (p.status !== 'out') {
+      if (p.chips === 0) {
+        p.status = 'out'; // eliminated
+      } else {
+        p.status = 'active';
+      }
+    }
+  });
+  addLog('new-hand', `═══ Hand #${state.handNumber} started ═══`);
+  renderGame();
+}
+
+function moveDealer() {
+  const active = state.players.filter(p => p.status !== 'out');
+  if (active.length < 2) return;
+  // find next active player after current dealer
+  let next = (state.dealerIndex + 1) % state.players.length;
+  let tries = 0;
+  while (state.players[next].status === 'out' && tries < state.players.length) {
+    next = (next + 1) % state.players.length;
+    tries++;
+  }
+  state.dealerIndex = next;
+  addLog('bet', `Dealer button moved to ${state.players[next].name}`);
+  renderGame();
+}
+
+// ─────────────────────────────────────────────────────────
+// RE-BUY
+// ─────────────────────────────────────────────────────────
+function openRebuy() {
+  showModal(`
+    <h3>💰 Re-buy / Add Chips</h3>
+    <p class="modal-note">Add chips to a player's stack. Useful for re-buys or correcting chip counts.</p>
+    <div class="player-select-list">
+      ${state.players.map(p => `
+        <div class="player-select-item" style="cursor:default;">
+          <div class="player-select-info">
+            <div class="player-select-name">${escHtml(p.name)}</div>
+            <div class="player-select-chips">${fmt(p.chips)} chips${p.status==='out'?' · eliminated':''}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="rebuy-${p.id}" value="${state.buyinAmount}" min="1"
+              style="width:90px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px;font-size:.85rem;" />
+            <button class="btn btn-gold" style="padding:6px 12px;font-size:.8rem;" onclick="confirmRebuy(${p.id})">Add</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Done</button>
+    </div>
+  `);
+}
+
+function confirmRebuy(id) {
+  const p = state.players.find(x => x.id === id);
+  const amt = parseInt(document.getElementById(`rebuy-${id}`).value) || 0;
+  if (amt <= 0) return;
+  p.chips += amt;
+  state.totalChipsInPlay += amt;
+  if (p.status === 'out') p.status = 'active';
+  addLog('bet', `${p.name} re-bought for ${fmt(amt)} — now has ${fmt(p.chips)}`);
+  renderGame();
+  closeModal();
+  openRebuy(); // reopen so user can do more
+}
+
+// ─────────────────────────────────────────────────────────
+// STANDINGS
+// ─────────────────────────────────────────────────────────
+function openStandings() {
+  const sorted = [...state.players].sort((a,b) => b.chips - a.chips);
+  const medals = ['🥇','🥈','🥉'];
+
+  const rowsHTML = sorted.map((p, i) => {
+    const delta = p.chips - state.buyinAmount;
+    const deltaStr = delta > 0
+      ? `<span class="standings-delta delta-pos">+${fmt(delta)}</span>`
+      : delta < 0
+      ? `<span class="standings-delta delta-neg">${fmt(delta)}</span>`
+      : '';
+    return `
+      <div class="standings-row">
+        <span class="standings-rank">${medals[i] || (i+1)+'.'}</span>
+        <span class="standings-name">${escHtml(p.name)}${p.status==='out'?'<span style="color:#666;font-size:.75rem;"> (out)</span>':''}</span>
+        <span class="standings-chips">${fmt(p.chips)}</span>
+        ${deltaStr}
+      </div>
+    `;
+  }).join('');
+
+  const totalInPlay = state.players.reduce((s, p) => s + p.chips, 0) + state.pot;
+
+  showModal(`
+    <h3>📊 Standings — Hand #${state.handNumber}</h3>
+    ${rowsHTML}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:.8rem;color:var(--muted);">
+      Chips in play: ${fmt(totalInPlay)} &nbsp;·&nbsp; Pot: ${fmt(state.pot)}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Close</button>
+    </div>
+  `);
+}
+
+// ─────────────────────────────────────────────────────────
+// LOG
+// ─────────────────────────────────────────────────────────
+function addLog(type, msg) {
+  const now = new Date();
+  const time = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  state.log.unshift({ type, msg, time });
+}
+
+function openLog() {
+  const list = document.getElementById('log-list');
+  list.innerHTML = state.log.length === 0
+    ? '<p style="color:var(--muted);padding:10px;font-size:.85rem;">No activity yet.</p>'
+    : state.log.map(e => `
+        <div class="log-entry ${e.type}">
+          <div class="log-time">${e.time}</div>
+          ${e.msg}
+        </div>
+      `).join('');
+  document.getElementById('log-panel').classList.add('open');
+  document.getElementById('log-overlay').classList.add('open');
+}
+
+function closeLog() {
+  document.getElementById('log-panel').classList.remove('open');
+  document.getElementById('log-overlay').classList.remove('open');
+}
+
+// ─────────────────────────────────────────────────────────
+// MODAL
+// ─────────────────────────────────────────────────────────
+function showModal(html) {
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// allow pressing Escape to close modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('modal-overlay').classList.remove('open');
+    closeLog();
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────────────────
+function backToSetup() {
+  if (!confirm('Return to setup? Current game progress will be lost.')) return;
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+}
+
+// ─────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────
+function fmt(n) {
+  return Number(n).toLocaleString();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
