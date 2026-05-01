@@ -457,6 +457,65 @@
     .standings-delta { font-size: .8rem; margin-left: 8px; }
     .delta-pos { color: #4caf50; }
     .delta-neg { color: var(--red); }
+
+    /* Chop modal */
+    .mode-toggle {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .mode-toggle button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      padding: 9px;
+      transition: background .15s, color .15s;
+    }
+    .mode-toggle button.active { background: var(--green2); color: var(--text); }
+
+    .chop-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      margin-top: 10px;
+      font-size: .9rem;
+    }
+    .chop-total-row .ok  { color: #4caf50; font-weight: 700; }
+    .chop-total-row .bad { color: var(--red); font-weight: 700; }
+
+    .chop-custom-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      margin-bottom: 7px;
+    }
+    .chop-custom-row .player-name-label { flex: 1; font-size: .95rem; font-weight: 600; }
+    .chop-custom-row input {
+      width: 110px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: .95rem;
+      padding: 7px 10px;
+      text-align: right;
+    }
+    .chop-custom-row input:focus { border-color: var(--gold); outline: none; }
   </style>
 </head>
 <body>
@@ -558,7 +617,8 @@
     <div class="pot-label">Total Pot</div>
     <div class="pot-amount" id="pot-display">0</div>
     <div class="pot-actions">
-      <button class="btn btn-gold" style="font-size:.9rem;padding:9px 18px;" onclick="openAwardPot()">🏆 Award Pot</button>
+      <button class="btn btn-gold"  style="font-size:.9rem;padding:9px 18px;" onclick="openAwardPot()">🏆 Award Pot</button>
+      <button class="btn btn-green" style="font-size:.9rem;padding:9px 16px;" onclick="openChop()">✂️ Chop</button>
       <button class="btn btn-ghost" style="font-size:.9rem;padding:9px 14px;" onclick="openAddToPot()">+ Add to Pot</button>
     </div>
   </div>
@@ -944,6 +1004,228 @@ function confirmAddToPot() {
     addLog('bet', `${fmt(amt)} added to pot`);
   }
   state.pot += amt;
+  closeModal();
+  renderGame();
+}
+
+// ─────────────────────────────────────────────────────────
+// CHOP
+// ─────────────────────────────────────────────────────────
+function openChop() {
+  if (state.pot === 0) { alert('The pot is empty.'); return; }
+  const candidates = state.players.filter(p => p.status !== 'out' && p.status !== 'fold');
+  if (candidates.length === 0) { alert('No active players to chop with.'); return; }
+  renderChopModal(candidates, 'even');
+}
+
+function renderChopModal(candidates, mode) {
+  const pot = state.pot;
+
+  const evenRows = candidates.map(p => `
+    <div class="player-select-item" id="chop-sel-${p.id}" onclick="toggleChopPlayer(${p.id})" style="user-select:none;">
+      <input type="checkbox" id="chop-chk-${p.id}" checked onclick="event.stopPropagation();toggleChopPlayer(${p.id})" />
+      <div class="player-select-info">
+        <div class="player-select-name">${escHtml(p.name)}</div>
+        <div class="player-select-chips">${fmt(p.chips)} chips</div>
+      </div>
+      <span class="split-pct" id="chop-share-${p.id}"></span>
+    </div>
+  `).join('');
+
+  const customRows = candidates.map(p => `
+    <div class="chop-custom-row">
+      <span class="player-name-label">${escHtml(p.name)}</span>
+      <span style="font-size:.8rem;color:var(--muted);">${fmt(p.chips)} +</span>
+      <input type="number" id="chop-amt-${p.id}" value="0" min="0" max="${pot}"
+        oninput="updateChopTotal(${pot})" placeholder="0" />
+    </div>
+  `).join('');
+
+  showModal(`
+    <h3>✂️ Chop Pot — ${fmt(pot)}</h3>
+
+    <div class="mode-toggle">
+      <button id="btn-even"   onclick="switchChopMode('even',   [${candidates.map(p=>p.id)}])"
+        class="${mode==='even'?'active':''}">Even Split</button>
+      <button id="btn-custom" onclick="switchChopMode('custom', [${candidates.map(p=>p.id)}])"
+        class="${mode==='custom'?'active':''}">Custom Amounts</button>
+    </div>
+
+    <div id="chop-even-panel"   style="display:${mode==='even'  ?'block':'none'};">
+      <p class="modal-note" style="margin-bottom:10px;">Select who is chopping. Remainder goes to the first selected player.</p>
+      <div class="player-select-list" id="chop-even-list">${evenRows}</div>
+      <div class="chop-total-row" id="chop-even-summary"></div>
+    </div>
+
+    <div id="chop-custom-panel" style="display:${mode==='custom'?'block':'none'};">
+      <p class="modal-note" style="margin-bottom:10px;">Enter each player's share. Total must equal the pot.</p>
+      ${customRows}
+      <div class="chop-total-row" id="chop-custom-total">
+        <span>Total allocated</span><span id="chop-total-val" class="bad">0 / ${fmt(pot)}</span>
+      </div>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:.82rem;padding:8px;"
+        onclick="splitEvenlyIntoCustom([${candidates.map(p=>p.id)}], ${pot})">Auto-fill even split</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-green" onclick="confirmChop([${candidates.map(p=>p.id)}], ${pot})">✂️ Chop It</button>
+    </div>
+  `);
+
+  if (mode === 'even') {
+    // All players pre-selected — show initial split
+    updateChopEvenSplit(candidates.map(p => p.id), pot);
+  }
+}
+
+function switchChopMode(mode, candidateIds) {
+  const evenPanel   = document.getElementById('chop-even-panel');
+  const customPanel = document.getElementById('chop-custom-panel');
+  const btnEven     = document.getElementById('btn-even');
+  const btnCustom   = document.getElementById('btn-custom');
+  if (mode === 'even') {
+    evenPanel.style.display   = 'block';
+    customPanel.style.display = 'none';
+    btnEven.classList.add('active');
+    btnCustom.classList.remove('active');
+    updateChopEvenSplit(candidateIds, state.pot);
+  } else {
+    evenPanel.style.display   = 'none';
+    customPanel.style.display = 'block';
+    btnCustom.classList.add('active');
+    btnEven.classList.remove('active');
+    updateChopTotal(state.pot);
+  }
+}
+
+function toggleChopPlayer(id) {
+  const chk  = document.getElementById(`chop-chk-${id}`);
+  const item = document.getElementById(`chop-sel-${id}`);
+  chk.checked = !chk.checked;
+  item.classList.toggle('selected', chk.checked);
+  // gather all candidate ids from checked items
+  const allItems = [...document.querySelectorAll('[id^="chop-sel-"]')];
+  const allIds   = allItems.map(el => parseInt(el.id.replace('chop-sel-', '')));
+  updateChopEvenSplit(allIds, state.pot);
+}
+
+function updateChopEvenSplit(allIds, pot) {
+  const selectedIds = allIds.filter(id => {
+    const chk = document.getElementById(`chop-chk-${id}`);
+    return chk && chk.checked;
+  });
+  const count = selectedIds.length;
+
+  // Clear all share labels
+  allIds.forEach(id => {
+    const el = document.getElementById(`chop-share-${id}`);
+    if (el) el.textContent = '';
+  });
+
+  const summary = document.getElementById('chop-even-summary');
+  if (count === 0) {
+    if (summary) summary.innerHTML = '<span>Select at least one player.</span>';
+    return;
+  }
+
+  const share     = Math.floor(pot / count);
+  const remainder = pot - share * count;
+
+  selectedIds.forEach((id, idx) => {
+    const el = document.getElementById(`chop-share-${id}`);
+    if (!el) return;
+    const gets = share + (idx === 0 ? remainder : 0);
+    el.textContent = fmt(gets);
+    el.style.color = 'var(--gold2)';
+    el.style.fontWeight = '700';
+  });
+
+  if (summary) {
+    const remainderNote = remainder > 0
+      ? ` <span style="color:var(--muted);font-size:.78rem;">(+${remainder} remainder to first)</span>`
+      : '';
+    summary.innerHTML = `
+      <span>${count} player${count>1?'s':''} chopping</span>
+      <span class="ok">${fmt(share)} each${remainderNote}</span>
+    `;
+  }
+}
+
+function updateChopTotal(pot) {
+  const inputs = [...document.querySelectorAll('[id^="chop-amt-"]')];
+  const total  = inputs.reduce((s, inp) => s + (parseInt(inp.value) || 0), 0);
+  const el     = document.getElementById('chop-total-val');
+  if (!el) return;
+  const ok = total === pot;
+  el.textContent = `${fmt(total)} / ${fmt(pot)}`;
+  el.className   = ok ? 'ok' : 'bad';
+}
+
+function splitEvenlyIntoCustom(candidateIds, pot) {
+  const count     = candidateIds.length;
+  const share     = Math.floor(pot / count);
+  const remainder = pot - share * count;
+  candidateIds.forEach((id, idx) => {
+    const inp = document.getElementById(`chop-amt-${id}`);
+    if (inp) inp.value = share + (idx === 0 ? remainder : 0);
+  });
+  updateChopTotal(pot);
+}
+
+function confirmChop(candidateIds, pot) {
+  const evenPanel = document.getElementById('chop-even-panel');
+  const isEven    = evenPanel && evenPanel.style.display !== 'none';
+
+  if (isEven) {
+    // Even mode — gather selected players
+    const selectedIds = candidateIds.filter(id => {
+      const chk = document.getElementById(`chop-chk-${id}`);
+      return chk && chk.checked;
+    });
+    if (selectedIds.length === 0) { alert('Select at least one player.'); return; }
+
+    const share     = Math.floor(pot / selectedIds.length);
+    const remainder = pot - share * selectedIds.length;
+
+    selectedIds.forEach((id, idx) => {
+      const p    = state.players.find(x => x.id === id);
+      if (!p) return;
+      const gets = share + (idx === 0 ? remainder : 0);
+      p.chips += gets;
+      if (p.status === 'allin' || p.status === 'fold') p.status = 'active';
+      addLog('win', `✂️ ${p.name} chopped ${fmt(gets)} — now has ${fmt(p.chips)}`);
+    });
+
+    const names = selectedIds.map(id => state.players.find(x=>x.id===id)?.name).filter(Boolean).join(', ');
+    addLog('win', `✂️ Pot of ${fmt(pot)} chopped between: ${names}`);
+
+  } else {
+    // Custom mode — validate total equals pot
+    const inputs = [...document.querySelectorAll('[id^="chop-amt-"]')];
+    const total  = inputs.reduce((s, inp) => s + (parseInt(inp.value) || 0), 0);
+    if (total !== pot) {
+      alert(`Total allocated (${fmt(total)}) must equal the pot (${fmt(pot)}).`);
+      return;
+    }
+
+    let anyAwarded = false;
+    candidateIds.forEach(id => {
+      const inp = document.getElementById(`chop-amt-${id}`);
+      const amt = parseInt(inp?.value) || 0;
+      if (amt <= 0) return;
+      const p = state.players.find(x => x.id === id);
+      if (!p) return;
+      p.chips += amt;
+      if (p.status === 'allin' || p.status === 'fold') p.status = 'active';
+      addLog('win', `✂️ ${p.name} chopped ${fmt(amt)} — now has ${fmt(p.chips)}`);
+      anyAwarded = true;
+    });
+    if (!anyAwarded) { alert('Enter amounts greater than 0.'); return; }
+  }
+
+  state.pot        = 0;
+  state.currentBet = 0;
   closeModal();
   renderGame();
 }
