@@ -726,7 +726,7 @@ function renderSetupList() {
   setupPlayers.forEach((name, i) => {
     const el = document.createElement('div');
     el.className = 'player-tag';
-    el.innerHTML = `<span>🪙 ${name}</span><button class="remove" onclick="removeSetupPlayer(${i})">✕</button>`;
+    el.innerHTML = `<span>🪙 ${escHtml(name)}</span><button class="remove" onclick="removeSetupPlayer(${i})">✕</button>`;
     list.appendChild(el);
   });
   hint.style.display = setupPlayers.length === 0 ? 'block' : 'none';
@@ -1570,7 +1570,7 @@ function openLog() {
     : state.log.map(e => `
         <div class="log-entry ${e.type}">
           <div class="log-time">${e.time}</div>
-          ${e.msg}
+          ${escHtml(e.msg)}
         </div>
       `).join('');
   document.getElementById('log-panel').classList.add('open');
